@@ -145,12 +145,12 @@ function HeroElectricWaves() {
   return (
     <svg
       className="hero-electric"
-      viewBox="0 0 520 240"
-      preserveAspectRatio="xMidYMid slice"
+      viewBox="0 0 720 240"
+      preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
     >
       <defs>
-        <filter id={filterId} x="0" y="0" width="100%" height="100%">
+        <filter id={filterId} x="-15%" y="-15%" width="130%" height="130%">
           <feGaussianBlur stdDeviation="2" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -164,8 +164,9 @@ function HeroElectricWaves() {
         </linearGradient>
         <linearGradient id={`${filterId}-pink`} x1="100%" y1="0%" x2="0%" y2="0%">
           <stop offset="0%" stopColor="#ff007a" stopOpacity="1" />
-          <stop offset="45%" stopColor="#ec4899" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.2" />
+          <stop offset="40%" stopColor="#ec4899" stopOpacity="0.85" />
+          <stop offset="72%" stopColor="#a855f7" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
         </linearGradient>
       </defs>
 
@@ -198,14 +199,14 @@ function HeroElectricWaves() {
       <g className="hero-electric__pink" filter={`url(#${filterId})`}>
         <path
           className="hero-electric__strand"
-          d="M300 108 C360 98, 400 118, 460 112 C490 108, 510 116, 520 110"
+          d="M300 108 C360 98, 400 118, 460 112 C490 108, 530 114, 580 108 C620 104, 660 110, 700 106"
           fill="none"
           stroke={`url(#${filterId}-pink)`}
           strokeWidth="2"
         />
         <path
           className="hero-electric__strand hero-electric__strand--delay"
-          d="M290 124 C350 116, 390 132, 450 126 C480 122, 505 130, 520 124"
+          d="M290 124 C350 116, 390 132, 450 126 C480 122, 520 128, 565 122 C605 118, 645 126, 690 120"
           fill="none"
           stroke="#ff007a"
           strokeWidth="1.4"
@@ -213,7 +214,7 @@ function HeroElectricWaves() {
         />
         <path
           className="hero-electric__strand"
-          d="M310 92 C370 86, 410 100, 470 94 C500 90, 515 98, 520 94"
+          d="M310 92 C370 86, 410 100, 470 94 C500 90, 540 96, 585 90 C625 86, 665 94, 705 88"
           fill="none"
           stroke="#f472b6"
           strokeWidth="1"
@@ -221,7 +222,7 @@ function HeroElectricWaves() {
         />
         <path
           className="hero-electric__strand hero-electric__strand--delay2"
-          d="M280 138 C340 130, 380 148, 440 140 C475 136, 505 144, 520 138"
+          d="M280 138 C340 130, 380 148, 440 140 C475 136, 515 142, 560 136 C600 132, 640 140, 685 134"
           fill="none"
           stroke="#ec4899"
           strokeWidth="0.9"
@@ -229,7 +230,7 @@ function HeroElectricWaves() {
         />
         <path
           className="hero-electric__strand"
-          d="M320 100 C380 94, 420 108, 480 102"
+          d="M320 100 C380 94, 420 108, 480 102 C530 98, 575 104, 620 100 C660 96, 695 102, 720 98"
           fill="none"
           stroke="#ff4d9d"
           strokeWidth="0.5"
@@ -243,7 +244,9 @@ function HeroElectricWaves() {
 function HeroVisual() {
   return (
     <div className="dash__hero-visual" aria-hidden="true">
-      <HeroElectricWaves />
+      <div className="dash__hero-waves">
+        <HeroElectricWaves />
+      </div>
       <div className="hero-ring">
         <span className="hero-ring__halo" />
         <div className="hero-ring__inner">
@@ -373,11 +376,115 @@ function TopBar({
   );
 }
 
+type AppAlertProps = {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  secondaryLabel?: string;
+  onConfirm: () => void;
+  onSecondary?: () => void;
+  onClose: () => void;
+};
+
+function IconInterest() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <path d="M7 7.5h10M7 12h7M7 16.5h10" strokeLinecap="round" />
+      <circle cx="5" cy="7.5" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="16.5" r="1.25" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function AppAlert({
+  open,
+  title,
+  message,
+  confirmLabel,
+  secondaryLabel,
+  onConfirm,
+  onSecondary,
+  onClose,
+}: AppAlertProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="app-alert">
+      <button
+        type="button"
+        className="app-alert__backdrop"
+        aria-label="Close dialog"
+        onClick={onClose}
+      />
+      <div
+        className="app-alert__dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="app-alert-title"
+        aria-describedby="app-alert-desc"
+      >
+        <div className="app-alert__glow" aria-hidden="true" />
+        <button
+          type="button"
+          className="app-alert__close"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+          </svg>
+        </button>
+        <div className="app-alert__icon" aria-hidden="true">
+          <IconInterest />
+        </div>
+        <h2 id="app-alert-title" className="app-alert__title">
+          {title}
+        </h2>
+        <p id="app-alert-desc" className="app-alert__message">
+          {message}
+        </p>
+        <div className="app-alert__actions">
+          {secondaryLabel && onSecondary && (
+            <button
+              type="button"
+              className="app-alert__btn app-alert__btn--secondary"
+              onClick={onSecondary}
+            >
+              <IconShuffle />
+              {secondaryLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            className="app-alert__btn app-alert__btn--primary"
+            onClick={onConfirm}
+            autoFocus
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Landing() {
   const [matchMode, setMatchMode] = useState<MatchMode>("random");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [joined, setJoined] = useState(false);
   const [callSeconds, setCallSeconds] = useState(0);
+  const [interestAlertOpen, setInterestAlertOpen] = useState(false);
 
   const {
     permissionState,
@@ -411,6 +518,11 @@ export function Landing() {
   };
 
   const handleJoin = async () => {
+    if (selectedInterests.length === 0) {
+      setInterestAlertOpen(true);
+      return;
+    }
+    setMatchMode("interest");
     const granted = await requestMicrophone();
     if (granted) setJoined(true);
   };
@@ -448,8 +560,7 @@ export function Landing() {
     return () => window.clearInterval(id);
   }, [isInCall]);
 
-  const ctaDisabled =
-    matchMode === "interest" && selectedInterests.length === 0;
+  const ctaDisabled = selectedInterests.length === 0;
 
   const interestPreview =
     selectedInterests.length > 0
@@ -495,7 +606,7 @@ export function Landing() {
             <header className="dash__hero">
               <div className="dash__hero-text">
                 <h1 className="dash__title">
-                  <span className="dash__title-word">Jam.</span>{" "}
+                  <span className="dash__title-word">Talk.</span>{" "}
                   <span className="dash__title-word dash__title-word--listen">
                     Listen.
                   </span>{" "}
@@ -564,9 +675,9 @@ export function Landing() {
                 <div className="match-panel__match">
                   <button
                     type="button"
-                    className="btn-start"
+                    className={`btn-start${ctaDisabled ? " btn-start--disabled" : ""}`}
                     onClick={handleJoin}
-                    disabled={ctaDisabled}
+                    aria-disabled={ctaDisabled}
                     aria-label="Start Matching"
                   >
                     <IconMic />
@@ -786,6 +897,20 @@ export function Landing() {
         </div>
         )}
       </div>
+
+      <AppAlert
+        open={interestAlertOpen}
+        title="Choose how to match"
+        message="Select one or more interests below to find someone with similar vibes — or jump straight into a random voice chat."
+        confirmLabel="Choose Interests"
+        secondaryLabel="I'm Feeling Lucky"
+        onConfirm={() => setInterestAlertOpen(false)}
+        onSecondary={async () => {
+          setInterestAlertOpen(false);
+          await handleLucky();
+        }}
+        onClose={() => setInterestAlertOpen(false)}
+      />
     </div>
   );
 }
