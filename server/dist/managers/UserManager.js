@@ -7,7 +7,22 @@ class UserManager {
     constructor() {
         this.users = new Map();
         this.queue = [];
+        this.io = null;
         this.roomManager = new RoomManager_1.RoomManager();
+    }
+    setIo(io) {
+        this.io = io;
+    }
+    getStats() {
+        var _a, _b;
+        const calling = Array.from(this.users.values()).filter((user) => user.roomId !== null).length;
+        const matching = this.queue.length;
+        const online = (_b = (_a = this.io) === null || _a === void 0 ? void 0 : _a.sockets.sockets.size) !== null && _b !== void 0 ? _b : this.users.size;
+        return { online, calling, matching };
+    }
+    broadcastStats() {
+        var _a;
+        (_a = this.io) === null || _a === void 0 ? void 0 : _a.emit("server-stats", this.getStats());
     }
     addUser(socket, payload = {}) {
         var _a, _b;
@@ -24,6 +39,7 @@ class UserManager {
         socket.emit("lobby");
         this.tryMatch();
         this.initHandlers(socket);
+        this.broadcastStats();
     }
     removeUser(socketId) {
         const user = this.users.get(socketId);
@@ -34,6 +50,7 @@ class UserManager {
         }
         this.dequeue(socketId);
         this.users.delete(socketId);
+        this.broadcastStats();
     }
     skipUser(socketId) {
         const user = this.users.get(socketId);
@@ -46,6 +63,7 @@ class UserManager {
         this.enqueue(socketId);
         user.socket.emit("lobby");
         this.tryMatch();
+        this.broadcastStats();
     }
     rematchUser(socketId, payload = {}) {
         var _a, _b;
@@ -61,6 +79,7 @@ class UserManager {
         this.enqueue(socketId);
         user.socket.emit("lobby");
         this.tryMatch();
+        this.broadcastStats();
     }
     handlePartnerLeft(roomId, leaverId, event) {
         const partner = this.roomManager.getPartner(roomId, leaverId);
@@ -73,6 +92,7 @@ class UserManager {
             partner.socket.emit("lobby");
             this.tryMatch();
         }
+        this.broadcastStats();
     }
     enqueue(socketId) {
         if (!this.queue.includes(socketId)) {
@@ -99,6 +119,7 @@ class UserManager {
             this.dequeue(id1);
             this.dequeue(id2);
             this.roomManager.createRoom(user1, user2);
+            this.broadcastStats();
         }
     }
     findBestMatch() {

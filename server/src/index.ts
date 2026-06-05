@@ -20,14 +20,35 @@ const io = new Server(server, {
   },
 });
 
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (clientOrigin === "*") {
+    res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", clientOrigin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 const userManager = new UserManager();
+userManager.setIo(io);
+
+app.get("/stats", (_req, res) => {
+  res.json(userManager.getStats());
+});
 
 io.on("connection", (socket: Socket) => {
   console.log("user connected:", socket.id);
+  socket.emit("server-stats", userManager.getStats());
 
   socket.on("join", (payload: JoinPayload) => {
     userManager.addUser(socket, payload);

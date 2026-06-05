@@ -16,10 +16,17 @@ interface UseWebRTCOptions {
   enabled: boolean;
 }
 
+export interface ServerStats {
+  online: number;
+  calling: number;
+  matching: number;
+}
+
 interface UseWebRTCResult {
   status: ConnectionStatus;
   statusMessage: string | null;
   remoteStream: MediaStream | null;
+  serverStats: ServerStats;
   skip: () => void;
   rematch: () => void;
 }
@@ -73,6 +80,11 @@ export function useWebRTC({
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [serverStats, setServerStats] = useState<ServerStats>({
+    online: 0,
+    calling: 0,
+    matching: 0,
+  });
 
   const socketRef = useRef<Socket | null>(null);
   const sendingPcRef = useRef<RTCPeerConnection | null>(null);
@@ -89,6 +101,15 @@ export function useWebRTC({
   interestsRef.current = interests;
   matchModeRef.current = matchMode;
 
+  const clearRemoteAudio = useCallback(() => {
+    if (remoteAudioRef.current?.srcObject) {
+      const stream = remoteAudioRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.srcObject = null;
+    }
+  }, []);
+
   const cleanupConnections = useCallback(() => {
     cleanupPeerConnection(sendingPcRef.current);
     cleanupPeerConnection(receivingPcRef.current);
@@ -98,11 +119,12 @@ export function useWebRTC({
     sendingPendingIceRef.current = [];
     receivingPendingIceRef.current = [];
 
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = null;
-    }
-    setRemoteStream(null);
-  }, []);
+    clearRemoteAudio();
+    setRemoteStream((prev) => {
+      prev?.getTracks().forEach((track) => track.stop());
+      return null;
+    });
+  }, [clearRemoteAudio]);
 
   const resetToLobby = useCallback(
     (message?: string) => {
@@ -143,6 +165,10 @@ export function useWebRTC({
         interests: interestsRef.current,
         matchMode: matchModeRef.current,
       });
+    });
+
+    socket.on("server-stats", (data: ServerStats) => {
+      setServerStats(data);
     });
 
     socket.on("lobby", () => {
@@ -331,5 +357,5 @@ export function useWebRTC({
     }
   }, [remoteStream]);
 
-  return { status, statusMessage, remoteStream, skip, rematch };
+  return { status, statusMessage, remoteStream, serverStats, skip, rematch };
 }

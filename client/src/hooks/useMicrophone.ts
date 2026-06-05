@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type MicPermissionState =
   | "prompt"
-  | "granted"
   | "denied"
   | "unsupported"
-  | "error";
+  | "error"
+  | "granted";
 
 interface UseMicrophoneResult {
   audioTrack: MediaStreamTrack | null;
@@ -17,6 +17,11 @@ interface UseMicrophoneResult {
   stopMicrophone: () => void;
 }
 
+function hasLiveAudioTrack(stream: MediaStream | null): boolean {
+  if (!stream) return false;
+  return stream.getAudioTracks().some((track) => track.readyState === "live");
+}
+
 export function useMicrophone(): UseMicrophoneResult {
   const [audioTrack, setAudioTrack] = useState<MediaStreamTrack | null>(null);
   const [permissionState, setPermissionState] =
@@ -26,10 +31,36 @@ export function useMicrophone(): UseMicrophoneResult {
   const streamRef = useRef<MediaStream | null>(null);
 
   const stopMicrophone = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    const stream = streamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
     streamRef.current = null;
     setAudioTrack(null);
+    setIsMuted(false);
+    setPermissionState("prompt");
+    setErrorMessage(null);
   }, []);
+
+  const bindStream = useCallback((stream: MediaStream) => {
+    const track = stream.getAudioTracks()[0];
+    if (!track || track.readyState !== "live") {
+      return false;
+    }
+
+    track.onended = () => {
+      if (streamRef.current === stream) {
+        stopMicrophone();
+      }
+    };
+
+    streamRef.current = stream;
+    setAudioTrack(track);
+    setIsMuted(false);
+    setPermissionState("granted");
+    setErrorMessage(null);
+    return true;
+  }, [stopMicrophone]);
 
   const requestMicrophone = useCallback(async (): Promise<boolean> => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -38,28 +69,23 @@ export function useMicrophone(): UseMicrophoneResult {
       return false;
     }
 
-    try {
-      stopMicrophone();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
-
-      const track = stream.getAudioTracks()[0];
-      if (!track) {
-        throw new Error("No audio track available.");
-      }
-
-      streamRef.current = stream;
+    if (hasLiveAudioTrack(streamRef.current)) {
+      const track = streamRef.current!.getAudioTracks()[0];
       setAudioTrack(track);
-      setIsMuted(false);
       setPermissionState("granted");
       setErrorMessage(null);
       return true;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setAudioTrack(null);
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      return bindStream(stream);
     } catch (err) {
       const error = err as DOMException;
       if (
@@ -73,6 +99,11 @@ export function useMicrophone(): UseMicrophoneResult {
       } else if (error.name === "NotFoundError") {
         setPermissionState("error");
         setErrorMessage("No microphone found. Connect a mic and try again.");
+      } else if (error.name === "NotReadableError") {
+        setPermissionState("error");
+        setErrorMessage(
+          "Microphone is in use by another app. Close it and try again."
+        );
       } else {
         setPermissionState("error");
         setErrorMessage(error.message || "Failed to access microphone.");
@@ -80,21 +111,32 @@ export function useMicrophone(): UseMicrophoneResult {
       stopMicrophone();
       return false;
     }
-  }, [stopMicrophone]);
+  }, [bindStream, stopMicrophone]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
       const next = !prev;
-      if (audioTrack) {
-        audioTrack.enabled = !next;
+      const track = streamRef.current?.getAudioTracks()[0] ?? audioTrack;
+      if (track && track.readyState === "live") {
+        track.enabled = !next;
       }
       return next;
     });
   }, [audioTrack]);
 
   useEffect(() => {
-    return () => {
+    const releaseMicOnExit = () => {
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+
+    window.addEventListener("pagehide", releaseMicOnExit);
+    window.addEventListener("beforeunload", releaseMicOnExit);
+
+    return () => {
+      window.removeEventListener("pagehide", releaseMicOnExit);
+      window.removeEventListener("beforeunload", releaseMicOnExit);
+      releaseMicOnExit();
     };
   }, []);
 

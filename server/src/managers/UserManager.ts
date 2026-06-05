@@ -1,15 +1,39 @@
-import { Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
 import { JoinPayload, MAX_ROOMS, User } from "../types";
 import { IceCandidatePayload, SessionDescription } from "../webrtc-types";
 import { RoomManager } from "./RoomManager";
+
+export interface ServerStats {
+  online: number;
+  calling: number;
+  matching: number;
+}
 
 export class UserManager {
   private users: Map<string, User> = new Map();
   private queue: string[] = [];
   private roomManager: RoomManager;
+  private io: Server | null = null;
 
   constructor() {
     this.roomManager = new RoomManager();
+  }
+
+  setIo(io: Server): void {
+    this.io = io;
+  }
+
+  getStats(): ServerStats {
+    const calling = Array.from(this.users.values()).filter(
+      (user) => user.roomId !== null
+    ).length;
+    const matching = this.queue.length;
+    const online = this.io?.sockets.sockets.size ?? this.users.size;
+    return { online, calling, matching };
+  }
+
+  private broadcastStats(): void {
+    this.io?.emit("server-stats", this.getStats());
   }
 
   addUser(socket: Socket, payload: JoinPayload = {}): void {
@@ -28,6 +52,7 @@ export class UserManager {
     socket.emit("lobby");
     this.tryMatch();
     this.initHandlers(socket);
+    this.broadcastStats();
   }
 
   removeUser(socketId: string): void {
@@ -40,6 +65,7 @@ export class UserManager {
 
     this.dequeue(socketId);
     this.users.delete(socketId);
+    this.broadcastStats();
   }
 
   skipUser(socketId: string): void {
@@ -54,6 +80,7 @@ export class UserManager {
     this.enqueue(socketId);
     user.socket.emit("lobby");
     this.tryMatch();
+    this.broadcastStats();
   }
 
   rematchUser(socketId: string, payload: JoinPayload = {}): void {
@@ -71,6 +98,7 @@ export class UserManager {
     this.enqueue(socketId);
     user.socket.emit("lobby");
     this.tryMatch();
+    this.broadcastStats();
   }
 
   private handlePartnerLeft(
@@ -89,6 +117,7 @@ export class UserManager {
       partner.socket.emit("lobby");
       this.tryMatch();
     }
+    this.broadcastStats();
   }
 
   private enqueue(socketId: string): void {
@@ -121,6 +150,7 @@ export class UserManager {
       this.dequeue(id1);
       this.dequeue(id2);
       this.roomManager.createRoom(user1, user2);
+      this.broadcastStats();
     }
   }
 
